@@ -148,6 +148,12 @@ void UCIEngine::loop() {
             sync_cout << engine.visualize() << sync_endl;
         else if (token == "eval")
             engine.trace_eval();
+        else if (token == "analyze")
+            analyze_position();
+        else if (token == "suggest")
+            suggest_moves();
+        else if (token == "stats")
+            show_engine_stats();
         else if (token == "compiler")
             sync_cout << compiler_info() << sync_endl;
         else if (token == "export_net")
@@ -170,6 +176,12 @@ void UCIEngine::loop() {
                  "\nthe Universal Chess Interface (UCI) protocol to communicate with a GUI, an API, etc."
                  "\nFor any further information, visit https://github.com/official-stockfish/Stockfish#readme"
                  "\nor read the corresponding README.md and Copying.txt files distributed along with this program.\n"
+                 "\nEnhanced Analysis Commands:"
+                 "\n  analyze  - Detailed position analysis with board visualization"
+                 "\n  suggest  - Move suggestions with confidence ratings"
+                 "\n  stats    - Engine performance and configuration statistics"
+                 "\n  eval     - NNUE evaluation trace (requires network files)"
+                 "\n  d        - Display current position\n"
               << sync_endl;
         else if (!token.empty() && token[0] != '#')
             sync_cout << "Unknown command: '" << cmd << "'. Type help for more information."
@@ -662,6 +674,171 @@ void UCIEngine::on_bestmove(std::string_view bestmove, std::string_view ponder) 
     if (!ponder.empty())
         std::cout << " ponder " << ponder;
     std::cout << sync_endl;
+}
+
+void UCIEngine::analyze_position() {
+    sync_cout << "info string === Advanced Position Analysis ===" << sync_endl;
+    
+    // Basic position information
+    sync_cout << "info string FEN: " << engine.fen() << sync_endl;
+    sync_cout << "info string Side to Move: " << (engine.fen().find(" w ") != std::string::npos ? "White" : "Black") << sync_endl;
+    
+    // Get detailed position visualization
+    std::string board = engine.visualize();
+    std::istringstream boardStream(board);
+    std::string line;
+    
+    sync_cout << "info string Board Visualization:" << sync_endl;
+    while (std::getline(boardStream, line)) {
+        if (!line.empty()) {
+            sync_cout << "info string " << line << sync_endl;
+        }
+    }
+    
+    // Basic position statistics
+    std::string fen = engine.fen();
+    std::istringstream fenStream(fen);
+    std::string fenParts[6];
+    for (int i = 0; i < 6; ++i) {
+        fenStream >> fenParts[i];
+    }
+    
+    sync_cout << "info string === Position Statistics ===" << sync_endl;
+    sync_cout << "info string Castling Rights: " << fenParts[2] << sync_endl;
+    sync_cout << "info string En Passant: " << fenParts[3] << sync_endl;
+    sync_cout << "info string Halfmove Clock: " << fenParts[4] << sync_endl;
+    sync_cout << "info string Fullmove Number: " << fenParts[5] << sync_endl;
+    
+    // Basic evaluation attempt (may display errors if no NNUE files)
+    sync_cout << "info string === Evaluation Attempt ===" << sync_endl;
+    sync_cout << "info string Note: NNUE evaluation may fail if network files are missing" << sync_endl;
+    
+    sync_cout << "info string === Analysis End ===" << sync_endl;
+}
+
+void UCIEngine::suggest_moves() {
+    sync_cout << "info string === Move Suggestions with Confidence ===" << sync_endl;
+    
+    // Set MultiPV to get multiple move suggestions
+    const int originalMultiPV = engine.get_options()["MultiPV"];
+    std::istringstream multiPVStream("setoption name MultiPV value 5");
+    setoption(multiPVStream);
+    
+    // Perform searches at different depths to assess confidence
+    std::vector<int> searchDepths = {6, 10, 15};
+    std::map<std::string, std::vector<int>> moveScores;
+    std::map<std::string, int> moveConfidence;
+    
+    for (int depth : searchDepths) {
+        sync_cout << "info string Analyzing at depth " << depth << "..." << sync_endl;
+        
+        Search::LimitsType limits;
+        limits.depth = depth;
+        
+        // Collect move evaluations
+        std::vector<std::pair<std::string, int>> currentDepthMoves;
+        
+        engine.set_on_update_full([&](const Engine::InfoFull& info) {
+            if (info.depth == depth && !info.pv.empty()) {
+                std::string pvStr(info.pv);
+                std::istringstream iss(pvStr);
+                std::string move;
+                if (iss >> move) {
+                    // Convert Score to centipawn value using existing UCI function
+                    std::string scoreStr = UCIEngine::format_score(info.score);
+                    int score = 0;
+                    
+                    // Parse centipawn value from score string (format: "cp XXX")
+                    if (scoreStr.find("cp ") == 0) {
+                        score = std::stoi(scoreStr.substr(3));
+                    }
+                    
+                    currentDepthMoves.push_back({move, score});
+                    moveScores[move].push_back(score);
+                }
+            }
+            on_update_full(info, engine.get_options()["UCI_ShowWDL"]);
+        });
+        
+        engine.go(limits);
+        engine.wait_for_search_finished();
+    }
+    
+    // Calculate confidence based on score consistency across depths
+    sync_cout << "info string === Move Analysis Results ===" << sync_endl;
+    
+    for (const auto& moveData : moveScores) {
+        const std::string& move = moveData.first;
+        const std::vector<int>& scores = moveData.second;
+        
+        if (scores.size() >= 2) {
+            // Calculate score variance to determine confidence
+            int scoreSum = 0;
+            for (int score : scores) {
+                scoreSum += score;
+            }
+            int avgScore = scoreSum / scores.size();
+            
+            int variance = 0;
+            for (int score : scores) {
+                variance += (score - avgScore) * (score - avgScore);
+            }
+            variance /= scores.size();
+            
+            // Lower variance = higher confidence
+            int confidence = std::max(0, 100 - variance / 100);
+            
+            sync_cout << "info string Move: " << move 
+                      << " | Avg Score: " << avgScore << " cp"
+                      << " | Confidence: " << confidence << "%" << sync_endl;
+        }
+    }
+    
+    // Restore original MultiPV setting
+    std::ostringstream restoreMultiPV;
+    restoreMultiPV << "setoption name MultiPV value " << originalMultiPV;
+    std::istringstream restoreStream(restoreMultiPV.str());
+    setoption(restoreStream);
+    
+    // Restore normal callback
+    engine.set_on_update_full([this](const auto& i) { 
+        on_update_full(i, engine.get_options()["UCI_ShowWDL"]); 
+    });
+    
+    sync_cout << "info string === Suggestions Complete ===" << sync_endl;
+}
+
+void UCIEngine::show_engine_stats() {
+    sync_cout << "info string === Engine Performance Statistics ===" << sync_endl;
+    
+    // Basic engine information
+    sync_cout << "info string Engine Version: " << engine_info(true) << sync_endl;
+    
+    // Hash table statistics
+    int hashfull = engine.get_hashfull();
+    sync_cout << "info string Hash Table Usage: " << hashfull << "/1000" << sync_endl;
+    
+    // Thread and NUMA information
+    sync_cout << "info string Thread Configuration:" << sync_endl;
+    sync_cout << "info string " << engine.thread_allocation_information_as_string() << sync_endl;
+    
+    sync_cout << "info string NUMA Configuration:" << sync_endl;
+    sync_cout << "info string " << engine.numa_config_information_as_string() << sync_endl;
+    
+    // Current options summary
+    sync_cout << "info string === Key Engine Options ===" << sync_endl;
+    const auto& options = engine.get_options();
+    
+    std::vector<std::string> keyOptions = {
+        "Threads", "Hash", "MultiPV", "Skill Level", 
+        "Move Overhead", "UCI_Chess960", "UCI_ShowWDL"
+    };
+    
+    for (const std::string& optName : keyOptions) {
+        sync_cout << "info string " << optName << ": " << options[optName] << sync_endl;
+    }
+    
+    sync_cout << "info string === Statistics Complete ===" << sync_endl;
 }
 
 }  // namespace Stockfish

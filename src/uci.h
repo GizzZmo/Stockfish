@@ -65,6 +65,9 @@ class UCIEngine {
     void          benchmark(std::istream& args);
     void          position(std::istringstream& is);
     void          setoption(std::istringstream& is);
+    void          analyze_position();
+    void          suggest_moves();
+    void          show_engine_stats();
     std::uint64_t perft(const Search::LimitsType&);
 
     static void on_update_no_moves(const Engine::InfoShort& info);
