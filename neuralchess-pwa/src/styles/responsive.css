@@ -1,0 +1,459 @@
+/* Responsive Design System */
+
+/* Breakpoint variables */
+:root {
+  --mobile-max: 480px;
+  --tablet-min: 481px;
+  --tablet-max: 768px;
+  --desktop-min: 769px;
+  --large-desktop-min: 1200px;
+  --ultra-wide-min: 1440px;
+}
+
+/* Mobile-first responsive design */
+
+/* Base styles (mobile) */
+.container {
+  width: 100%;
+  padding: 1rem;
+  margin: 0 auto;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.flex {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Chess board responsive sizing */
+.chess-board {
+  width: 100%;
+  max-width: min(calc(100vw - 2rem), calc(100vh - 200px));
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+
+/* Mobile styles (up to 480px) */
+@media screen and (max-width: 480px) {
+  .container {
+    padding: 0.5rem;
+  }
+  
+  .app-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .logo-section {
+    justify-content: center;
+  }
+  
+  .title {
+    font-size: 1.25rem;
+  }
+  
+  .logo {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.25rem;
+  }
+  
+  .header-controls {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .app-main {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .board-container {
+    padding: 1rem;
+  }
+  
+  .chess-board {
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .game-controls {
+    padding: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: stretch;
+  }
+  
+  .control-btn {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .btn-text {
+    display: none;
+  }
+  
+  .btn-icon {
+    font-size: 1.25rem;
+  }
+  
+  .side-panel {
+    order: 2;
+  }
+  
+  .panel-section {
+    min-height: 150px;
+  }
+  
+  .app-footer {
+    padding: 0.5rem 1rem;
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+  }
+  
+  .status-section {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .status-item {
+    justify-content: center;
+  }
+}
+
+/* Tablet styles (481px to 768px) */
+@media screen and (min-width: 481px) and (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .app-main {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  
+  .chess-board {
+    max-width: min(500px, calc(100vw - 2rem));
+  }
+  
+  .side-panel {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  .panel-section {
+    min-height: 200px;
+  }
+  
+  .game-controls {
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  
+  .control-btn .btn-text {
+    display: inline;
+  }
+}
+
+/* Desktop styles (769px to 1199px) */
+@media screen and (min-width: 769px) and (max-width: 1199px) {
+  .container {
+    max-width: 1000px;
+    padding: 1.5rem;
+  }
+  
+  .app-main {
+    grid-template-columns: 1fr 280px;
+    gap: 1.5rem;
+  }
+  
+  .chess-board {
+    max-width: 600px;
+  }
+  
+  .side-panel {
+    flex-direction: column;
+  }
+  
+  .panel-section {
+    min-height: 200px;
+  }
+}
+
+/* Large desktop styles (1200px to 1439px) */
+@media screen and (min-width: 1200px) and (max-width: 1439px) {
+  .container {
+    max-width: 1200px;
+    padding: 2rem;
+  }
+  
+  .app-main {
+    grid-template-columns: 1fr 320px;
+    gap: 2rem;
+  }
+  
+  .chess-board {
+    max-width: 700px;
+  }
+  
+  .board-container {
+    padding: 2rem;
+  }
+  
+  .panel-section {
+    min-height: 250px;
+  }
+}
+
+/* Ultra-wide desktop styles (1440px+) */
+@media screen and (min-width: 1440px) {
+  .container {
+    max-width: 1400px;
+    padding: 2rem;
+  }
+  
+  .app-main {
+    grid-template-columns: 1fr 350px;
+    gap: 2.5rem;
+  }
+  
+  .chess-board {
+    max-width: 800px;
+  }
+  
+  .board-container {
+    padding: 2.5rem;
+  }
+  
+  .panel-section {
+    min-height: 300px;
+  }
+}
+
+/* Orientation-based responsive design */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+  .app {
+    grid-template-rows: auto 1fr;
+  }
+  
+  .app-footer {
+    display: none;
+  }
+  
+  .app-main {
+    grid-template-columns: 1fr 250px;
+  }
+  
+  .chess-board {
+    max-width: calc(100vh - 100px);
+  }
+  
+  .panel-section {
+    min-height: 120px;
+  }
+}
+
+/* High DPI displays */
+@media screen and (-webkit-min-device-pixel-ratio: 2),
+       screen and (min-resolution: 192dpi) {
+  .chess-board {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+  
+  .logo {
+    transform: translateZ(0);
+  }
+}
+
+/* Accessibility: Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .app-main {
+    transition: none;
+  }
+  
+  .side-panel {
+    transition: none;
+  }
+  
+  .panel-section {
+    transition: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .app-header,
+  .app-footer,
+  .game-controls,
+  .engine-panel {
+    display: none !important;
+  }
+  
+  .app {
+    grid-template-rows: 1fr;
+    padding: 0;
+  }
+  
+  .app-main {
+    grid-template-columns: 1fr;
+  }
+  
+  .chess-board {
+    max-width: 100%;
+    break-inside: avoid;
+  }
+  
+  .board-container {
+    padding: 0;
+    background: white !important;
+    border: 1px solid #000;
+  }
+  
+  .glass-card {
+    background: white !important;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+  
+  body {
+    background: white !important;
+    color: #000 !important;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --text-primary: rgba(255, 255, 255, 0.98);
+    --text-secondary: rgba(255, 255, 255, 0.85);
+    --text-muted: rgba(255, 255, 255, 0.65);
+  }
+}
+
+/* Light mode adjustments */
+@media (prefers-color-scheme: light) {
+  :root {
+    --primary-gradient: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.9);
+    --text-primary: rgba(0, 0, 0, 0.95);
+    --text-secondary: rgba(0, 0, 0, 0.8);
+    --text-muted: rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Container queries (progressive enhancement) */
+@supports (container-type: inline-size) {
+  .responsive-container {
+    container-type: inline-size;
+  }
+  
+  @container (max-width: 400px) {
+    .control-btn .btn-text {
+      display: none;
+    }
+  }
+  
+  @container (max-width: 600px) {
+    .side-panel {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+/* Touch device optimizations */
+@media (pointer: coarse) {
+  .control-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  .chess-square {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  
+  .form-control {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Hover capability detection */
+@media (hover: hover) {
+  .hover-effects {
+    transition: all 0.2s ease;
+  }
+  
+  .hover-effects:hover {
+    transform: translateY(-2px);
+  }
+}
+
+@media (hover: none) {
+  .hover-effects:hover {
+    transform: none;
+  }
+  
+  .hover-effects:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Utility classes for responsive design */
+.hide-mobile {
+  display: none;
+}
+
+@media screen and (min-width: 481px) {
+  .hide-mobile {
+    display: initial;
+  }
+  
+  .show-mobile {
+    display: none;
+  }
+}
+
+.hide-tablet {
+  display: initial;
+}
+
+@media screen and (min-width: 481px) and (max-width: 768px) {
+  .hide-tablet {
+    display: none;
+  }
+  
+  .show-tablet {
+    display: initial;
+  }
+}
+
+.hide-desktop {
+  display: initial;
+}
+
+@media screen and (min-width: 769px) {
+  .hide-desktop {
+    display: none;
+  }
+  
+  .show-desktop {
+    display: initial;
+  }
+}

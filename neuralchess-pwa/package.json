@@ -1,0 +1,52 @@
+{
+  "name": "neuralchess-pwa",
+  "version": "1.0.0",
+  "description": "Modern Progressive Web App interface for Stockfish chess engine",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:e2e": "playwright test",
+    "test:coverage": "vitest --coverage",
+    "build:wasm": "npm run build:stockfish-wasm",
+    "build:stockfish-wasm": "cd ../src && emcc -O3 -s WASM=1 -s EXPORTED_FUNCTIONS='[\"_main\"]' -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\"]' -s ALLOW_MEMORY_GROWTH=1 *.cpp -o ../neuralchess-pwa/public/stockfish.js",
+    "lint": "eslint . --ext .vue,.js,.ts",
+    "lint:fix": "eslint . --ext .vue,.js,.ts --fix",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "vue": "^3.4.15",
+    "@vueuse/core": "^10.7.2",
+    "chess.js": "^1.0.0-beta.8",
+    "pinia": "^2.1.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.3",
+    "@vue/eslint-config-typescript": "^12.0.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.20.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vite-plugin-pwa": "^0.17.4",
+    "vitest": "^1.2.2",
+    "vue-tsc": "^1.8.27",
+    "@playwright/test": "^1.41.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "keywords": [
+    "chess",
+    "stockfish",
+    "pwa",
+    "vue",
+    "webassembly",
+    "glassmorphism"
+  ],
+  "author": "NeuralChess Team",
+  "license": "GPL-3.0"
+}
