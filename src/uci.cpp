@@ -150,6 +150,8 @@ void UCIEngine::loop() {
             engine.trace_eval();
         else if (token == "compiler")
             sync_cout << compiler_info() << sync_endl;
+        else if (token == "about")
+            sync_cout << about_info() << sync_endl;
         else if (token == "export_net")
         {
             std::pair<std::optional<std::string>, std::string> files[2];

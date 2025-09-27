@@ -161,6 +161,44 @@ std::string engine_info(bool to_uci) {
          + "the Stockfish developers (see AUTHORS file)";
 }
 
+std::string about_info() {
+    std::stringstream ss;
+    
+    ss << "About " << engine_version_info() << "\n\n";
+    
+    ss << "Stockfish is a free, powerful UCI chess engine derived from Glaurung 2.1.\n";
+    ss << "Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)\n\n";
+    
+    ss << "This program is free software: you can redistribute it and/or modify\n";
+    ss << "it under the terms of the GNU General Public License as published by\n"; 
+    ss << "the Free Software Foundation, either version 3 of the License, or\n";
+    ss << "(at your option) any later version.\n\n";
+    
+    ss << "Stockfish is distributed in the hope that it will be useful,\n";
+    ss << "but WITHOUT ANY WARRANTY; without even the implied warranty of\n";
+    ss << "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the\n";
+    ss << "GNU General Public License for more details.\n\n";
+    
+    ss << "Key Features:\n";
+    ss << "- Strong chess engine with advanced search and evaluation\n";
+    ss << "- Neural Network (NNUE) evaluation for enhanced play\n";
+    ss << "- Universal Chess Interface (UCI) protocol support\n";
+    ss << "- Multi-threaded search for improved performance\n";
+    ss << "- Support for various CPU architectures and optimizations\n";
+    ss << "- Extensive opening book and endgame tablebase support\n\n";
+    
+    ss << "Development:\n";
+    ss << "- Project website: https://stockfishchess.org\n";
+    ss << "- Source code: https://github.com/official-stockfish/Stockfish\n";
+    ss << "- Testing framework: https://tests.stockfishchess.org\n";
+    ss << "- License: GNU General Public License v3.0\n\n";
+    
+    ss << "For detailed usage instructions, type 'help'\n";
+    ss << "For compiler information, type 'compiler'\n";
+    
+    return ss.str();
+}
+
 
 // Returns a string trying to describe the compiler we use
 std::string compiler_info() {
