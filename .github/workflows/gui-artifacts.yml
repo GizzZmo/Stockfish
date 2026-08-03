@@ -143,11 +143,12 @@ jobs:
         run: |
           dotnet publish NexusChess.Desktop/NexusChess.Desktop.csproj \
             -c Release \
-            -o ../../artifacts/nexuschess \
+            -o ../artifacts/nexuschess \
             --self-contained false
 
       - name: Add build info
         run: |
+          mkdir -p artifacts/nexuschess
           cat > artifacts/nexuschess/BUILD_INFO.txt << EOF
           NexusChess – Avalonia UI for Stockfish
           Commit: ${{ github.sha }}
