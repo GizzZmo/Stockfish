@@ -30,22 +30,34 @@ jobs:
         with:
           persist-credentials: false
 
+      # No package-lock.json in neuralchess-pwa yet — skip npm cache
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: neuralchess-pwa/package-lock.json
 
       - name: Install dependencies
         working-directory: neuralchess-pwa
-        run: npm ci || npm install
+        run: npm install
 
       - name: Build PWA
         working-directory: neuralchess-pwa
         run: npm run build
         env:
           CI: true
+
+      - name: Install Playwright browsers
+        working-directory: neuralchess-pwa
+        run: |
+          # Use the package already listed in package.json (playwright ^1.41.0)
+          if [ ! -d node_modules/playwright ]; then
+            npm install --no-save playwright@1.41.0
+          fi
+          # Prefer local binary so browser revision matches the package
+          ./node_modules/.bin/playwright install chromium
+          # System deps: best-effort (may already be present on ubuntu-latest)
+          ./node_modules/.bin/playwright install-deps chromium || \
+            sudo ./node_modules/.bin/playwright install-deps chromium || true
 
       - name: Start preview server
         working-directory: neuralchess-pwa
@@ -61,12 +73,6 @@ jobs:
           done
           echo "Server failed to start"
           exit 1
-
-      - name: Ensure Playwright package
-        working-directory: neuralchess-pwa
-        run: |
-          npm install --no-save playwright@1.41.0
-          npx playwright install --with-deps chromium
 
       - name: Generate screenshots
         working-directory: neuralchess-pwa
@@ -110,11 +116,15 @@ jobs:
         working-directory: matrix-gui
         run: |
           npm ci || npm install
+          # playwright + serve are CI-only helpers (not in package.json)
           npm install --no-save playwright@1.41.0 serve@14.2.0
 
       - name: Install Playwright browsers
         working-directory: matrix-gui
-        run: npx --yes playwright install --with-deps chromium
+        run: |
+          ./node_modules/.bin/playwright install chromium
+          ./node_modules/.bin/playwright install-deps chromium || \
+            sudo ./node_modules/.bin/playwright install-deps chromium || true
 
       - name: Build React app
         working-directory: matrix-gui

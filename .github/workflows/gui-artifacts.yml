@@ -75,16 +75,15 @@ jobs:
         with:
           persist-credentials: false
 
+      # No package-lock.json in neuralchess-pwa yet — skip npm cache
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: neuralchess-pwa/package-lock.json
 
       - name: Install dependencies
         working-directory: neuralchess-pwa
-        run: npm ci || npm install
+        run: npm install
 
       - name: Build PWA
         working-directory: neuralchess-pwa
@@ -100,10 +99,12 @@ jobs:
           elif [ -d neuralchess-pwa/build ]; then
             cp -r neuralchess-pwa/build/* artifacts/neuralchess-pwa/
           else
-            echo "No dist/build folder found" && ls -la neuralchess-pwa/ && exit 1
+            echo "No build output found"
+            ls -la neuralchess-pwa/
+            exit 1
           fi
           cat > artifacts/neuralchess-pwa/BUILD_INFO.txt << EOF
-          NeuralChess PWA – Stockfish Glassmorphism Interface
+          NeuralChess PWA – Stockfish Web Interface
           Commit: ${{ github.sha }}
           Branch: ${{ github.ref_name }}
           Built: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -117,69 +118,3 @@ jobs:
           path: artifacts/neuralchess-pwa/
           retention-days: 30
           if-no-files-found: error
-
-  nexuschess-avalonia:
-    name: NexusChess (Avalonia)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Restore
-        working-directory: "Avalonia UI"
-        run: dotnet restore NexusChess.sln
-
-      - name: Build (Release)
-        working-directory: "Avalonia UI"
-        run: dotnet build NexusChess.sln -c Release --no-restore
-
-      - name: Publish desktop app
-        working-directory: "Avalonia UI"
-        run: |
-          dotnet publish NexusChess.Desktop/NexusChess.Desktop.csproj \
-            -c Release \
-            -o ../../artifacts/nexuschess \
-            --self-contained false
-
-      - name: Add build info
-        run: |
-          cat > artifacts/nexuschess/BUILD_INFO.txt << EOF
-          NexusChess – Avalonia UI for Stockfish
-          Commit: ${{ github.sha }}
-          Branch: ${{ github.ref_name }}
-          Built: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          Framework: .NET 8 / Avalonia
-          Workflow: ${{ github.run_id }}
-          EOF
-
-      - name: Upload NexusChess artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexuschess-avalonia-${{ github.sha }}
-          path: artifacts/nexuschess/
-          retention-days: 30
-          if-no-files-found: error
-
-  summary:
-    name: Artifacts summary
-    needs: [matrix-gui, neuralchess-pwa, nexuschess-avalonia]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Write summary
-        run: |
-          echo "# 📦 GUI Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| GUI | Status | Artifact name |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|---------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Matrix GUI | ${{ needs.matrix-gui.result }} | matrix-gui-web-${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| NeuralChess PWA | ${{ needs.neuralchess-pwa.result }} | neuralchess-pwa-${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| NexusChess Avalonia | ${{ needs.nexuschess-avalonia.result }} | nexuschess-avalonia-${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Download artifacts from the Actions run page." >> $GITHUB_STEP_SUMMARY
