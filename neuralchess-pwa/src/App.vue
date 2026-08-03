@@ -1,180 +1,148 @@
 <template>
-  <div id="app" class="app">
-    <!-- Background gradient -->
+  <div class="app">
     <div class="app-background"></div>
-    
-    <!-- Header -->
+
     <header class="app-header glass-card">
       <div class="header-content">
         <div class="logo-section">
           <div class="logo">♛</div>
-          <h1 class="title">NeuralChess</h1>
+          <div>
+            <p class="eyebrow">Stockfish in the browser</p>
+            <h1 class="title">NeuralChess PWA</h1>
+          </div>
         </div>
-        
-        <div class="header-controls">
-          <ThemeSelector />
-          <button 
-            class="control-btn"
-            @click="toggleEnginePanel"
-            :aria-pressed="showEnginePanel"
-          >
-            <span class="btn-icon">⚙️</span>
-            <span class="btn-text">Engine</span>
-          </button>
+
+        <div class="status-pill glass-card subtle">
+          <span class="status-dot" :class="{ online: isOnline }"></span>
+          <span>{{ isOnline ? 'Online ready' : 'Offline mode' }}</span>
         </div>
       </div>
     </header>
 
-    <!-- Main content -->
     <main class="app-main">
-      <!-- Chess board section -->
       <section class="board-section">
         <div class="board-container glass-card">
-          <ChessBoard 
-            :position="gameState.position"
-            :orientation="gameState.orientation"
-            :lastMove="gameState.lastMove"
-            :legalMoves="gameState.legalMoves"
-            @move="handleMove"
-          />
+          <div class="chess-board" role="img" aria-label="Decorative chess board preview">
+            <div
+              v-for="square in squares"
+              :key="square.name"
+              class="chess-square"
+              :class="square.color"
+            >
+              <span class="square-label">{{ square.name }}</span>
+              <span class="piece">{{ square.piece }}</span>
+            </div>
+          </div>
         </div>
-        
-        <!-- Game controls -->
-        <div class="game-controls glass-card">
-          <button 
-            class="control-btn primary"
-            @click="newGame"
-          >
-            <span class="btn-icon">🆕</span>
-            <span class="btn-text">New Game</span>
-          </button>
-          
-          <button 
-            class="control-btn"
-            @click="flipBoard"
-          >
-            <span class="btn-icon">🔄</span>
-            <span class="btn-text">Flip</span>
-          </button>
-          
-          <button 
-            class="control-btn"
-            @click="undoMove"
-            :disabled="!canUndo"
-          >
-            <span class="btn-icon">↶</span>
-            <span class="btn-text">Undo</span>
-          </button>
+
+        <div class="hero-copy glass-card">
+          <div class="hero-actions">
+            <button class="control-btn primary" type="button">Launch analysis</button>
+            <button class="control-btn" type="button">Install PWA</button>
+          </div>
+          <p>
+            A responsive, glassmorphism-inspired shell for a future Stockfish-powered
+            web experience. This preview is intentionally lightweight so the PWA can
+            build reliably in CI while still producing representative screenshots.
+          </p>
         </div>
       </section>
 
-      <!-- Side panel -->
       <aside class="side-panel">
-        <!-- Game history -->
-        <div class="panel-section">
-          <GameHistory 
-            :moves="gameState.history"
-            :currentMoveIndex="gameState.currentMoveIndex"
-            @goto-move="gotoMove"
-          />
-        </div>
-        
-        <!-- Engine panel (collapsible) -->
-        <div 
-          class="panel-section engine-panel"
-          :class="{ expanded: showEnginePanel }"
-        >
-          <EnginePanel 
-            v-if="showEnginePanel"
-            :analysis="engineState.analysis"
-            :isAnalyzing="engineState.isAnalyzing"
-            :depth="engineState.depth"
-            @start-analysis="startAnalysis"
-            @stop-analysis="stopAnalysis"
-            @set-depth="setEngineDepth"
-          />
-        </div>
+        <section class="panel-section glass-card">
+          <h2>Highlights</h2>
+          <ul class="feature-list">
+            <li>Responsive desktop and mobile layouts</li>
+            <li>Offline-ready progressive web app shell</li>
+            <li>Stockfish-focused branding and presentation</li>
+          </ul>
+        </section>
+
+        <section class="panel-section glass-card">
+          <h2>Planned modules</h2>
+          <div class="module-grid">
+            <div class="module-card">
+              <strong>Board UI</strong>
+              <span>Interactive move input and history</span>
+            </div>
+            <div class="module-card">
+              <strong>Engine</strong>
+              <span>WebAssembly-backed analysis controls</span>
+            </div>
+            <div class="module-card">
+              <strong>Themes</strong>
+              <span>Adaptive light and dark glass presets</span>
+            </div>
+          </div>
+        </section>
       </aside>
     </main>
-
-    <!-- Status bar -->
-    <footer class="app-footer glass-card">
-      <div class="status-section">
-        <span class="status-item">
-          <span class="status-label">Turn:</span>
-          <span class="status-value">{{ gameState.turn === 'w' ? 'White' : 'Black' }}</span>
-        </span>
-        
-        <span class="status-item">
-          <span class="status-label">Engine:</span>
-          <span 
-            class="status-value"
-            :class="{ 
-              'status-ready': engineState.isReady,
-              'status-error': engineState.error
-            }"
-          >
-            {{ engineStatusText }}
-          </span>
-        </span>
-      </div>
-      
-      <div class="connection-indicator" :class="{ online: isOnline }"></div>
-    </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useOnline } from '@vueuse/core'
-import ChessBoard from './components/ChessBoard.vue'
-import GameHistory from './components/GameHistory.vue'
-import EnginePanel from './components/EnginePanel.vue'
-import ThemeSelector from './components/ThemeSelector.vue'
-import { useChessGame } from './composables/useChessGame'
-import { useEngine } from './composables/useEngine'
 
-// Composables
 const isOnline = useOnline()
-const { gameState, newGame, makeMove, undoMove, flipBoard, gotoMove, canUndo } = useChessGame()
-const { engineState, startAnalysis, stopAnalysis, setEngineDepth, initializeEngine } = useEngine()
-
-// Local state
-const showEnginePanel = ref(true)
-
-// Computed
-const engineStatusText = computed(() => {
-  if (engineState.error) return 'Error'
-  if (!engineState.isReady) return 'Loading...'
-  if (engineState.isAnalyzing) return 'Analyzing...'
-  return 'Ready'
-})
-
-// Methods
-const toggleEnginePanel = () => {
-  showEnginePanel.value = !showEnginePanel.value
+const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const pieces = {
+  a8: '♜',
+  b8: '♞',
+  c8: '♝',
+  d8: '♛',
+  e8: '♚',
+  f8: '♝',
+  g8: '♞',
+  h8: '♜',
+  a7: '♟',
+  b7: '♟',
+  c7: '♟',
+  d7: '♟',
+  e7: '♟',
+  f7: '♟',
+  g7: '♟',
+  h7: '♟',
+  c6: '♘',
+  f3: '♙',
+  a2: '♙',
+  b2: '♙',
+  c2: '♙',
+  d2: '♙',
+  e2: '♙',
+  g2: '♙',
+  h2: '♙',
+  a1: '♖',
+  b1: '♘',
+  c1: '♗',
+  d1: '♕',
+  e1: '♔',
+  f1: '♗',
+  g1: '♘',
+  h1: '♖',
 }
 
-const handleMove = (move) => {
-  makeMove(move)
-  // Start analysis after player move
-  if (engineState.isReady && gameState.value.turn !== gameState.value.playerColor) {
-    startAnalysis(gameState.value.position)
-  }
-}
+const squares = computed(() =>
+  Array.from({ length: 8 }, (_, rankIndex) => {
+    const rank = 8 - rankIndex
 
-// Lifecycle
-onMounted(async () => {
-  await initializeEngine()
-  newGame()
-})
+    return files.map((file, fileIndex) => {
+      const name = `${file}${rank}`
+      return {
+        name,
+        color: (rankIndex + fileIndex) % 2 === 0 ? 'light' : 'dark',
+        piece: pieces[name] ?? '',
+      }
+    })
+  }).flat(),
+)
 </script>
 
 <style scoped>
 .app {
   min-height: 100vh;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   gap: 1rem;
   padding: 1rem;
   position: relative;
@@ -182,22 +150,24 @@ onMounted(async () => {
 
 .app-background {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 35%),
+    linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   z-index: -1;
 }
 
-.app-header {
-  padding: 1rem 1.5rem;
+.app-header,
+.hero-copy,
+.panel-section {
+  padding: 1.25rem;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -209,42 +179,61 @@ onMounted(async () => {
 }
 
 .logo {
-  font-size: 2rem;
   width: 3rem;
   height: 3rem;
-  background: linear-gradient(135deg, #60a5fa, #34d399);
+  display: grid;
+  place-items: center;
   border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: linear-gradient(135deg, #60a5fa, #34d399);
   color: white;
-  animation: logoFloat 3s ease-in-out infinite;
+  font-size: 1.75rem;
+  box-shadow: 0 10px 30px rgba(52, 211, 153, 0.35);
+}
+
+.eyebrow {
+  margin: 0 0 0.25rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
 }
 
 .title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  color: white;
   margin: 0;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-.header-controls {
-  display: flex;
+.status-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+}
+
+.status-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 0 0.2rem rgba(248, 113, 113, 0.18);
+}
+
+.status-dot.online {
+  background: #34d399;
+  box-shadow: 0 0 0 0.2rem rgba(52, 211, 153, 0.18);
 }
 
 .app-main {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 1.5rem;
   max-width: 1400px;
-  margin: 0 auto;
   width: 100%;
+  margin: 0 auto;
 }
 
-.board-section {
+.board-section,
+.side-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -252,181 +241,138 @@ onMounted(async () => {
 
 .board-container {
   padding: 1.5rem;
-  display: flex;
-  justify-content: center;
 }
 
-.game-controls {
-  padding: 1rem;
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-}
-
-.side-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.panel-section {
-  flex: 1;
-  min-height: 200px;
-}
-
-.engine-panel {
-  transition: all 0.3s ease;
-  overflow: hidden;
-}
-
-.engine-panel:not(.expanded) {
-  height: 0;
-  min-height: 0;
-  opacity: 0;
-}
-
-.app-footer {
-  padding: 0.75rem 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 1400px;
+.chess-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: min(100%, 720px);
+  aspect-ratio: 1;
   margin: 0 auto;
-  width: 100%;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 20px 50px rgba(31, 38, 135, 0.35);
 }
 
-.status-section {
+.chess-square {
+  position: relative;
   display: flex;
-  gap: 2rem;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1rem, 2.4vw, 2.6rem);
 }
 
-.status-item {
+.chess-square.light {
+  background: rgba(255, 255, 255, 0.88);
+  color: #111827;
+}
+
+.chess-square.dark {
+  background: rgba(37, 99, 235, 0.55);
+  color: white;
+}
+
+.square-label {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.4rem;
+  font-size: 0.65rem;
+  opacity: 0.75;
+}
+
+.piece {
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.hero-actions {
   display: flex;
-  gap: 0.5rem;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.875rem;
-}
-
-.status-label {
-  opacity: 0.7;
-}
-
-.status-value {
-  font-weight: 500;
-}
-
-.status-ready {
-  color: #34d399;
-}
-
-.status-error {
-  color: #f87171;
-}
-
-.connection-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #f87171;
-  transition: background-color 0.3s ease;
-}
-
-.connection-indicator.online {
-  background: #34d399;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .control-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  justify-content: center;
+  padding: 0.7rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.5rem;
-  color: white;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  font-weight: 600;
+  transition: transform 0.2s ease, background 0.2s ease;
 }
 
-.control-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+.control-btn:hover {
   transform: translateY(-1px);
-}
-
-.control-btn:active {
-  transform: translateY(0);
-}
-
-.control-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .control-btn.primary {
   background: linear-gradient(135deg, #60a5fa, #34d399);
   border-color: transparent;
+  color: white;
 }
 
-.control-btn.primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #3b82f6, #10b981);
+.feature-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary);
 }
 
-.btn-icon {
-  font-size: 1rem;
+.feature-list li + li {
+  margin-top: 0.75rem;
 }
 
-.btn-text {
-  font-size: 0.8rem;
+.module-grid {
+  display: grid;
+  gap: 0.75rem;
 }
 
-@keyframes logoFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
+.module-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
+.module-card span {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 900px) {
   .app-main {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
   }
-  
-  .side-panel {
-    order: 2;
-  }
-  
+
   .header-content {
-    padding: 0;
-  }
-  
-  .title {
-    font-size: 1.5rem;
-  }
-  
-  .logo {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1.5rem;
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
 @media (max-width: 480px) {
   .app {
-    padding: 0.5rem;
-    gap: 0.75rem;
+    padding: 0.75rem;
   }
-  
-  .game-controls {
-    flex-wrap: wrap;
+
+  .board-container,
+  .app-header,
+  .hero-copy,
+  .panel-section {
+    padding: 1rem;
   }
-  
-  .control-btn {
-    flex: 1;
-    min-width: 0;
+
+  .logo {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.4rem;
   }
 }
 </style>
