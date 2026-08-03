@@ -93,9 +93,17 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['vue', 'pinia', '@vueuse/core'],
-          chess: ['chess.js']
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('chess.js')) return 'chess'
+            if (
+              id.includes('/vue/') ||
+              id.includes('/pinia/') ||
+              id.includes('/@vueuse/')
+            ) {
+              return 'vendor'
+            }
+          }
         }
       }
     },
