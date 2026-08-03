@@ -56,7 +56,6 @@ if (!widths.length) {
 }
 
 async function main() {
-  const { chromium } = await import('playwright');
   await mkdir(outDir, { recursive: true });
 
   const browser = await chromium.launch({

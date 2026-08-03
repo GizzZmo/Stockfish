@@ -55,6 +55,9 @@ jobs:
           fi
           # Prefer local binary so browser revision matches the package
           ./node_modules/.bin/playwright install chromium
+          # On Ubuntu 24.04 'libasound2' was renamed to 'libasound2t64'; provide
+          # the alias before playwright install-deps to avoid apt errors.
+          sudo apt-get install -y libasound2t64 2>/dev/null || true
           # System deps: best-effort (may already be present on ubuntu-latest)
           ./node_modules/.bin/playwright install-deps chromium || \
             sudo ./node_modules/.bin/playwright install-deps chromium || true
@@ -123,6 +126,9 @@ jobs:
         working-directory: matrix-gui
         run: |
           ./node_modules/.bin/playwright install chromium
+          # On Ubuntu 24.04 'libasound2' was renamed to 'libasound2t64'; provide
+          # the alias before playwright install-deps to avoid apt errors.
+          sudo apt-get install -y libasound2t64 2>/dev/null || true
           ./node_modules/.bin/playwright install-deps chromium || \
             sudo ./node_modules/.bin/playwright install-deps chromium || true
 
