@@ -94,12 +94,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('chess.js')) return 'chess'
+          if (/[/\\]node_modules[/\\]/.test(id)) {
+            if (/[/\\]chess\.js[/\\]/.test(id)) return 'chess'
             if (
-              id.includes('/vue/') ||
-              id.includes('/pinia/') ||
-              id.includes('/@vueuse/')
+              /[/\\]vue[/\\]/.test(id) ||
+              /[/\\]pinia[/\\]/.test(id) ||
+              /[/\\]@vueuse[/\\]/.test(id)
             ) {
               return 'vendor'
             }

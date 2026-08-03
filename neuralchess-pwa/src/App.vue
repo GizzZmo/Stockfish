@@ -22,7 +22,7 @@
     <main class="app-main">
       <section class="board-section">
         <div class="board-container glass-card">
-          <div class="chess-board" aria-label="Decorative chess board preview">
+          <div class="chess-board" role="img" aria-label="Decorative chess board preview">
             <div
               v-for="square in squares"
               :key="square.name"
