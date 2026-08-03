@@ -28,6 +28,10 @@ matrix-gui/dist/
 matrix-gui/engine/stockfish*
 !matrix-gui/engine/README.md
 
+# NeuralChess PWA
+neuralchess-pwa/node_modules/
+neuralchess-pwa/dist/
+
 # .NET build artifacts
 bin/
 obj/
