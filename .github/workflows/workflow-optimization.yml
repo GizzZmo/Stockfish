@@ -91,61 +91,29 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      - name: Detect change focus
+        id: focus
+        run: |
+          if git diff --name-only HEAD~1 2>/dev/null | grep -q "src/nnue/"; then
+            echo "area=nnue" >> $GITHUB_OUTPUT
+          elif git diff --name-only HEAD~1 2>/dev/null | grep -q "src/search"; then
+            echo "area=search" >> $GITHUB_OUTPUT
+          else
+            echo "area=general" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate optimized build matrix
         id: matrix
         run: |
-          # Create optimized matrix based on changes and resource allocation
-          
-          # Check what type of changes we have
-          if git diff --name-only HEAD~1 2>/dev/null | grep -q "src/nnue/"; then
-            FOCUS="nnue"
-          elif git diff --name-only HEAD~1 2>/dev/null | grep -q "src/search"; then
-            FOCUS="search"
-          else
-            FOCUS="general"
-          fi
-          
-          # Generate matrix based on focus and resource allocation
-          case "${{ needs.resource-optimizer.outputs.resource-allocation }}" in
-            high-performance)
-              MATRIX='{
-                "include": [
-                  {"os": "ubuntu-latest", "arch": "x86-64-avx2", "priority": "high"},
-                  {"os": "ubuntu-latest", "arch": "x86-64-bmi2", "priority": "high"},
-                  {"os": "macos-latest", "arch": "x86-64-avx2", "priority": "medium"},
-                  {"os": "windows-latest", "arch": "x86-64-avx2", "priority": "medium"},
-                  {"os": "ubuntu-latest", "arch": "armv8", "priority": "low"}
-                ]
-              }'
-              STAGES="parallel"
-              ;;
-            balanced)
-              MATRIX='{
-                "include": [
-                  {"os": "ubuntu-latest", "arch": "x86-64-avx2", "priority": "high"},
-                  {"os": "macos-latest", "arch": "x86-64-avx2", "priority": "medium"},
-                  {"os": "windows-latest", "arch": "x86-64-avx2", "priority": "medium"}
-                ]
-              }'
-              STAGES="sequential"
-              ;;
-            *)
-              MATRIX='{
-                "include": [
-                  {"os": "ubuntu-latest", "arch": "x86-64", "priority": "high"}
-                ]
-              }'
-              STAGES="minimal"
-              ;;
-          esac
-          
-          echo "matrix<<EOF" >> $GITHUB_OUTPUT
-          echo "$MATRIX" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "stages=$STAGES" >> $GITHUB_OUTPUT
-          
-          echo "Optimized matrix generated:"
-          echo "$MATRIX" | jq '.'
+          bash scripts/generate-matrix.sh \
+            --allocation "${{ needs.resource-optimizer.outputs.resource-allocation }}" \
+            --focus "${{ steps.focus.outputs.area }}" \
+            --event "${{ github.event_name }}" \
+            --github-output \
+            --pretty
 
   efficient-compilation:
     name: Efficient Compilation
@@ -163,12 +131,23 @@ jobs:
       - name: Setup optimized environment
         run: |
           # Configure optimal build environment
-          echo "Setting up optimized build environment for ${{ matrix.arch }} on ${{ matrix.os }}"
+          JOBS="${{ needs.resource-optimizer.outputs.parallel-jobs }}"
+          echo "MAKEFLAGS=-j$JOBS" >> $GITHUB_ENV
           
-          # Install ccache if available
-          if command -v apt-get >/dev/null; then
-            sudo apt-get update -qq && sudo apt-get install -y -qq ccache || true
-          fi
+          # Platform-specific optimizations
+          case "${{ runner.os }}" in
+            Linux)
+              sudo apt update
+              sudo apt install ccache
+              echo "CC=ccache gcc" >> $GITHUB_ENV
+              echo "CXX=ccache g++" >> $GITHUB_ENV
+              ;;
+            macOS)
+              brew install ccache
+              echo "CC=ccache clang" >> $GITHUB_ENV
+              echo "CXX=ccache clang++" >> $GITHUB_ENV
+              ;;
+          esac
 
       - name: Restore aggressive cache
         if: needs.resource-optimizer.outputs.cache-strategy == 'aggressive'
@@ -177,6 +156,7 @@ jobs:
           path: |
             ~/.ccache
             src/*.nnue
+            ~/.cache
           key: aggressive-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('src/**') }}
           restore-keys: |
             aggressive-cache-${{ runner.os }}-${{ matrix.arch }}-
