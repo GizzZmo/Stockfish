@@ -25,7 +25,9 @@
   "devDependencies": {
     "concurrently": "^8.0.0",
     "wait-on": "^7.0.0",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^24.0.0",
+    "playwright": "^1.41.0",
+    "serve": "^14.2.0"
   },
   "browserslist": {
     "production": [

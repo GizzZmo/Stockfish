@@ -25,7 +25,7 @@ env:
 # Workflow-level concurrency control
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ inputs.enable_auto_cancel }}
+  cancel-in-progress: ${{ inputs.enable_auto_cancel != false }}
 
 jobs:
   resource-optimizer:
@@ -47,7 +47,7 @@ jobs:
             aggressive)
               JOBS=8
               CACHE="aggressive"
-              ALLOCATION="high-cpu"
+              ALLOCATION="high-performance"
               ;;
             conservative)
               JOBS=2
@@ -139,7 +139,9 @@ jobs:
               ;;
           esac
           
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$MATRIX" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           echo "stages=$STAGES" >> $GITHUB_OUTPUT
           
           echo "Optimized matrix generated:"
@@ -151,7 +153,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: ${{ needs.resource-optimizer.outputs.resource-allocation != 'high-performance' }}
-      max-parallel: ${{ matrix.priority == 'high' && 4 || 2 }}
+      max-parallel: 4
       matrix: ${{ fromJson(needs.optimize-build-matrix.outputs.optimized-matrix) }}
     steps:
       - uses: actions/checkout@v4
@@ -161,23 +163,12 @@ jobs:
       - name: Setup optimized environment
         run: |
           # Configure optimal build environment
-          JOBS="${{ needs.resource-optimizer.outputs.parallel-jobs }}"
-          echo "MAKEFLAGS=-j$JOBS" >> $GITHUB_ENV
+          echo "Setting up optimized build environment for ${{ matrix.arch }} on ${{ matrix.os }}"
           
-          # Platform-specific optimizations
-          case "${{ runner.os }}" in
-            Linux)
-              sudo apt update
-              sudo apt install ccache
-              echo "CC=ccache gcc" >> $GITHUB_ENV
-              echo "CXX=ccache g++" >> $GITHUB_ENV
-              ;;
-            macOS)
-              brew install ccache
-              echo "CC=ccache clang" >> $GITHUB_ENV
-              echo "CXX=ccache clang++" >> $GITHUB_ENV
-              ;;
-          esac
+          # Install ccache if available
+          if command -v apt-get >/dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq ccache || true
+          fi
 
       - name: Restore aggressive cache
         if: needs.resource-optimizer.outputs.cache-strategy == 'aggressive'
@@ -186,7 +177,6 @@ jobs:
           path: |
             ~/.ccache
             src/*.nnue
-            ~/.cache
           key: aggressive-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('src/**') }}
           restore-keys: |
             aggressive-cache-${{ runner.os }}-${{ matrix.arch }}-

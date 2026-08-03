@@ -70,7 +70,7 @@ jobs:
         working-directory: neuralchess-pwa
         run: |
           mkdir -p ../screenshots/neuralchess
-          node ../scripts/generate-screenshots.mjs \
+          NODE_PATH=./node_modules node ../scripts/generate-screenshots.mjs \
             --url http://127.0.0.1:4173 \
             --out ../screenshots/neuralchess \
             --name neuralchess \
@@ -131,7 +131,7 @@ jobs:
             sleep 1
           done
           mkdir -p ../screenshots/matrix-gui
-          node ../scripts/generate-screenshots.mjs \
+          NODE_PATH=./node_modules node ../scripts/generate-screenshots.mjs \
             --url http://127.0.0.1:3000 \
             --out ../screenshots/matrix-gui \
             --name matrix-gui \
