@@ -7,7 +7,6 @@
  *   node scripts/generate-screenshots.mjs --url http://127.0.0.1:4173 --out screenshots/neuralchess --name neuralchess --widths 1280,1920,390
  */
 
-import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -29,6 +28,7 @@ const widths = values.widths.split(',').map((w) => parseInt(w.trim(), 10)).filte
 const waitMs = parseInt(values.wait, 10) || 2000;
 
 async function main() {
+  const { chromium } = await import('playwright');
   await mkdir(outDir, { recursive: true });
 
   const browser = await chromium.launch({
