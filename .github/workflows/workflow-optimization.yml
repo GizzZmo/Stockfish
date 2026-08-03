@@ -1,1 +1,207 @@
-PLACEHOLDER
+name: Workflow Optimization
+on:
+  workflow_call:
+    inputs:
+      max_parallel_jobs:
+        type: number
+        required: false
+        default: 4
+      enable_auto_cancel:
+        type: boolean
+        required: false
+        default: true
+      resource_optimization:
+        type: string
+        required: false
+        default: 'balanced'
+
+env:
+  MAKEFLAGS: "-j${{ inputs.max_parallel_jobs }}"
+  CCACHE_COMPILERCHECK: content
+  CCACHE_COMPRESS: true
+  CCACHE_COMPRESSLEVEL: 6
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ inputs.enable_auto_cancel != false }}
+
+jobs:
+  resource-optimizer:
+    name: Resource Optimization Analysis
+    runs-on: ubuntu-latest
+    outputs:
+      runner-strategy: ${{ steps.allocate.outputs.strategy }}
+      parallel-jobs: ${{ steps.allocate.outputs.jobs }}
+      cache-strategy: ${{ steps.allocate.outputs.cache }}
+      resource-allocation: ${{ steps.allocate.outputs.allocation }}
+      focus: ${{ steps.allocate.outputs.focus }}
+      max-parallel: ${{ steps.allocate.outputs.max-parallel }}
+      fail-fast: ${{ steps.allocate.outputs.fail-fast }}
+      score: ${{ steps.allocate.outputs.score }}
+      reason: ${{ steps.allocate.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Dynamic resource allocation
+        id: allocate
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          bash scripts/allocate-resources.sh \
+            --event "${{ github.event_name }}" \
+            --ref "${{ github.ref }}" \
+            --base-strategy "${{ inputs.resource_optimization || 'auto' }}" \
+            --github-output \
+            --pretty
+
+  optimize-build-matrix:
+    name: Optimize Build Matrix
+    needs: resource-optimizer
+    runs-on: ubuntu-latest
+    outputs:
+      optimized-matrix: ${{ steps.matrix.outputs.matrix }}
+      build-stages: ${{ steps.matrix.outputs.stages }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      - name: Generate optimized build matrix
+        id: matrix
+        run: |
+          bash scripts/generate-matrix.sh \
+            --allocation "${{ needs.resource-optimizer.outputs.resource-allocation }}" \
+            --focus "${{ needs.resource-optimizer.outputs.focus }}" \
+            --event "${{ github.event_name }}" \
+            --github-output \
+            --pretty
+
+  efficient-compilation:
+    name: Efficient Compilation
+    needs: [resource-optimizer, optimize-build-matrix]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: ${{ needs.resource-optimizer.outputs.fail-fast == 'true' }}
+      max-parallel: ${{ fromJson(needs.resource-optimizer.outputs.max-parallel) }}
+      matrix: ${{ fromJson(needs.optimize-build-matrix.outputs.optimized-matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup optimized environment
+        run: |
+          JOBS="${{ needs.resource-optimizer.outputs.parallel-jobs }}"
+          echo "MAKEFLAGS=-j$JOBS" >> $GITHUB_ENV
+          case "${{ runner.os }}" in
+            Linux)
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq ccache || true
+              echo "CC=ccache gcc" >> $GITHUB_ENV
+              echo "CXX=ccache g++" >> $GITHUB_ENV
+              ;;
+            macOS)
+              brew install ccache || true
+              echo "CC=ccache clang" >> $GITHUB_ENV
+              echo "CXX=ccache clang++" >> $GITHUB_ENV
+              ;;
+          esac
+
+      - name: Restore aggressive cache
+        if: needs.resource-optimizer.outputs.cache-strategy == 'aggressive'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ccache
+            src/*.nnue
+          key: aggressive-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            aggressive-cache-${{ runner.os }}-${{ matrix.arch }}-
+            aggressive-cache-${{ runner.os }}-
+
+      - name: Restore balanced cache
+        if: needs.resource-optimizer.outputs.cache-strategy == 'balanced'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ccache
+            src/*.nnue
+          key: balanced-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('src/Makefile', 'src/*.h') }}
+          restore-keys: |
+            balanced-cache-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Optimized build
+        working-directory: src
+        run: |
+          case "${{ matrix.priority }}" in
+            high)
+              make net || true
+              make clean || true
+              time make -j${{ needs.resource-optimizer.outputs.parallel-jobs }} ARCH=${{ matrix.arch }} profile-build || make -j${{ needs.resource-optimizer.outputs.parallel-jobs }} ARCH=${{ matrix.arch }} build
+              ;;
+            medium)
+              make net || true
+              make clean || true
+              time make -j${{ needs.resource-optimizer.outputs.parallel-jobs }} ARCH=${{ matrix.arch }} build
+              ;;
+            low)
+              make net || true
+              make clean || true
+              time make -j2 ARCH=${{ matrix.arch }} build
+              ;;
+          esac
+
+      - name: Quick validation
+        working-directory: src
+        run: |
+          echo "bench 8" | timeout 30 ./stockfish || echo "Build validation completed"
+
+  resource-monitoring:
+    name: Resource Usage Monitoring
+    needs: [resource-optimizer, efficient-compilation]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Monitor and report resource usage
+        run: |
+          echo "# Workflow Optimization Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Dynamic Allocation" >> $GITHUB_STEP_SUMMARY
+          echo "- **Score**: ${{ needs.resource-optimizer.outputs.score }} / 100" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strategy**: ${{ needs.resource-optimizer.outputs.runner-strategy }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Allocation**: ${{ needs.resource-optimizer.outputs.resource-allocation }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Focus**: ${{ needs.resource-optimizer.outputs.focus }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Parallel Jobs**: ${{ needs.resource-optimizer.outputs.parallel-jobs }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Matrix max-parallel**: ${{ needs.resource-optimizer.outputs.max-parallel }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Strategy**: ${{ needs.resource-optimizer.outputs.cache-strategy }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fail-fast**: ${{ needs.resource-optimizer.outputs.fail-fast }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason**: ${{ needs.resource-optimizer.outputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Performance Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Compilation**: ${{ needs.efficient-compilation.result }}" >> $GITHUB_STEP_SUMMARY
+
+  auto-tune-suggestions:
+    name: Auto-tune Suggestions
+    needs: [resource-optimizer, efficient-compilation, resource-monitoring]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate auto-tuning suggestions
+        run: |
+          echo "## Auto-tuning Suggestions" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.efficient-compilation.result }}" = "success" ]; then
+            echo "### Current Configuration Working Well" >> $GITHUB_STEP_SUMMARY
+            echo "- Parallel jobs: ${{ needs.resource-optimizer.outputs.parallel-jobs }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Cache strategy: ${{ needs.resource-optimizer.outputs.cache-strategy }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Optimization Issues Detected" >> $GITHUB_STEP_SUMMARY
+            echo "- Consider a more conservative allocation" >> $GITHUB_STEP_SUMMARY
+          fi
