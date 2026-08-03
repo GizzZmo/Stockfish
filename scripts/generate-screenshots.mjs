@@ -3,13 +3,36 @@
  * generate-screenshots.mjs
  * Capture full-page screenshots of a running web app with Playwright.
  *
- * Usage:
- *   node scripts/generate-screenshots.mjs --url http://127.0.0.1:4173 --out screenshots/neuralchess --name neuralchess --widths 1280,1920,390
+ * Usage (from a package dir that has playwright installed, e.g. matrix-gui/):
+ *   node ../scripts/generate-screenshots.mjs --url http://127.0.0.1:4173 --out ../screenshots/app --name app --widths 1280,1920,390
+ *
+ * Playwright is resolved from process.cwd() (the package directory), not from
+ * scripts/, because ESM import resolution ignores NODE_PATH.
  */
 
+import { createRequire } from 'node:module';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+
+// Resolve 'playwright' from the caller's working directory (e.g. matrix-gui/node_modules),
+// not from scripts/ — static `import from 'playwright'` only walks up from this file.
+const requireFromCwd = createRequire(join(process.cwd(), 'package.json'));
+let chromium;
+try {
+  ({ chromium } = requireFromCwd('playwright'));
+} catch (err) {
+  console.error(
+    "Cannot find package 'playwright' from cwd=%s\n" +
+      'Install it in the package you run from, e.g.:\n' +
+      '  npm install -D playwright\n' +
+      '  npx playwright install chromium\n' +
+      'Original error: %s',
+    process.cwd(),
+    err.message,
+  );
+  process.exit(1);
+}
 
 const { values } = parseArgs({
   options: {
@@ -26,6 +49,11 @@ const outDir = values.out;
 const name = values.name;
 const widths = values.widths.split(',').map((w) => parseInt(w.trim(), 10)).filter(Boolean);
 const waitMs = parseInt(values.wait, 10) || 2000;
+
+if (!widths.length) {
+  console.error('No valid widths provided (got: %s)', values.widths);
+  process.exit(1);
+}
 
 async function main() {
   const { chromium } = await import('playwright');
@@ -61,18 +89,24 @@ async function main() {
       results.push({ width, height, file });
     } catch (err) {
       console.error(`Failed at width ${width}:`, err.message);
-      // Still try a partial capture
       try {
         const file = join(outDir, `${name}-${width}px-error.png`);
         await page.screenshot({ path: file, fullPage: false, type: 'png' });
         results.push({ width, height, file, error: err.message });
-      } catch (_) {}
+      } catch (_) {
+        /* ignore secondary capture failure */
+      }
     } finally {
       await context.close();
     }
   }
 
   await browser.close();
+
+  if (!results.length) {
+    console.error('No screenshots were captured');
+    process.exit(1);
+  }
 
   const meta = {
     url,

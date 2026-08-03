@@ -1,0 +1,176 @@
+# Dynamic Playwright sharding example
+#
+# 1. A lightweight "generate" job counts tests and produces a matrix.
+# 2. The "test" job expands that matrix and runs one shard per runner.
+# 3. A final "merge" job combines blob reports into a single HTML report.
+#
+# Requires:
+#   - scripts/generate-playwright-shard-matrix.sh
+#   - playwright.config.ts with:
+#       reporter: process.env.CI ? [['blob'], ['github']] : 'html'
+#
+# Adjust TESTS_PER_SHARD / MAX_SHARDS via env or by editing the generate step.
+
+name: Playwright Dynamic Shards
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '**.spec.ts'
+      - '**.spec.js'
+      - '**.test.ts'
+      - 'playwright.config.*'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/generate-playwright-shard-matrix.sh'
+      - '.github/workflows/playwright-dynamic-shards.yml'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      tests_per_shard:
+        description: 'Target tests per shard'
+        required: false
+        default: '25'
+      max_shards:
+        description: 'Hard upper bound on shards'
+        required: false
+        default: '8'
+
+concurrency:
+  group: playwright-dynamic-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. Generate dynamic matrix
+  # --------------------------------------------------------------------------
+  generate-shards:
+    name: Generate shard matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.shards.outputs.matrix }}
+      shard-count: ${{ steps.shards.outputs.shard-count }}
+      test-count: ${{ steps.shards.outputs.test-count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      # Listing only needs the Playwright package; browsers are not required
+      - name: Ensure Playwright CLI is available
+        run: npx --yes playwright --version || npm install -D playwright
+
+      - name: Generate shard matrix
+        id: shards
+        env:
+          PW_TESTS_PER_SHARD: ${{ github.event.inputs.tests_per_shard || '25' }}
+          PW_MAX_SHARDS: ${{ github.event.inputs.max_shards || '8' }}
+          PW_MIN_SHARDS: '1'
+        run: |
+          chmod +x scripts/generate-playwright-shard-matrix.sh
+          bash scripts/generate-playwright-shard-matrix.sh --github-output --pretty
+
+  # --------------------------------------------------------------------------
+  # 2. Run sharded tests
+  # --------------------------------------------------------------------------
+  test:
+    name: Test (shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+    needs: generate-shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-shards.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests (shard)
+        run: |
+          npx playwright test \
+            --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} \
+            --reporter=blob,github
+        env:
+          CI: true
+
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-shard-${{ matrix.shardIndex }}
+          path: blob-report/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  # --------------------------------------------------------------------------
+  # 3. Merge reports
+  # --------------------------------------------------------------------------
+  merge-reports:
+    name: Merge HTML report
+    needs: [generate-shards, test]
+    if: ${{ always() && needs.generate-shards.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Download all blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-shard-*
+          merge-multiple: true
+
+      - name: Merge into HTML report
+        run: |
+          # Playwright expects the blob files under a single directory
+          mkdir -p blob-report
+          find all-blob-reports -name '*.zip' -exec cp {} blob-report/ \; || true
+          if [ -z "$(ls -A blob-report 2>/dev/null)" ]; then
+            echo "No blob reports found – skipping merge"
+            exit 0
+          fi
+          npx playwright merge-reports --reporter html ./blob-report
+
+      - name: Upload merged HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-merged
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Summary
+        run: |
+          echo "### Playwright Dynamic Sharding" >> $GITHUB_STEP_SUMMARY
+          echo "- Detected tests: **${{ needs.generate-shards.outputs.test-count }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Shards used: **${{ needs.generate-shards.outputs.shard-count }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Matrix generated by \`scripts/generate-playwright-shard-matrix.sh\`" >> $GITHUB_STEP_SUMMARY

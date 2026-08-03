@@ -75,16 +75,15 @@ jobs:
         with:
           persist-credentials: false
 
+      # No package-lock.json in neuralchess-pwa yet — skip npm cache
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: neuralchess-pwa/package-lock.json
 
       - name: Install dependencies
         working-directory: neuralchess-pwa
-        run: npm ci || npm install
+        run: npm install
 
       - name: Build PWA
         working-directory: neuralchess-pwa
@@ -144,11 +143,12 @@ jobs:
         run: |
           dotnet publish NexusChess.Desktop/NexusChess.Desktop.csproj \
             -c Release \
-            -o ../../artifacts/nexuschess \
+            -o ../artifacts/nexuschess \
             --self-contained false
 
       - name: Add build info
         run: |
+          mkdir -p artifacts/nexuschess
           cat > artifacts/nexuschess/BUILD_INFO.txt << EOF
           NexusChess – Avalonia UI for Stockfish
           Commit: ${{ github.sha }}
